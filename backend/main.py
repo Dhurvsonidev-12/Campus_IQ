@@ -1,22 +1,35 @@
-from fastapi import FastAPI, Depends
+from fastapi import FastAPI, Depends, HTTPException, UploadFile, File, Form
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from sqlalchemy.orm import Session
+import uuid
+import os
 import qrcode
+import shutil
+import joblib
 
 from database import engine, Base, SessionLocal
 import models
-import uuid
-from fastapi import HTTPException
-import os
-import joblib
-model = joblib.load("ai/attendance_model.pkl")
+from security import hash_password, verify_password, create_access_token
+from auth import get_current_user
 
 app = FastAPI(title="CampusIQ API")
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
+os.makedirs("qr_codes", exist_ok=True)
+os.makedirs("uploads", exist_ok=True)
+
+app.mount("/qr_codes", StaticFiles(directory="qr_codes"), name="qr_codes")
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 
 Base.metadata.create_all(bind=engine)
-
-
 
 def get_db():
     db = SessionLocal()
@@ -25,53 +38,94 @@ def get_db():
     finally:
         db.close()
 
+model = joblib.load("ai/attendance_model.pkl")
 
 @app.get("/")
 def home():
     return {"message": "CampusIQ Backend Running"}
 
+from pydantic import BaseModel
 
+class RegisterRequest(BaseModel):
+    name: str
+    email: str
+    password: str
+    role: str
 
 @app.post("/register")
-def register_user(
-    name: str,
-    email: str,
-    password: str,
-    role: str = "student",
-    db: Session = Depends(get_db)
-):
+def register_user(data: RegisterRequest, db: Session = Depends(get_db)):
+
+    existing_user = db.query(models.User).filter(models.User.email == data.email).first()
+
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Email already registered")
+
+    hashed_password = hash_password(data.password)
 
     user = models.User(
-        name=name,
-        email=email,
-        password=password,
-        role=role
+        name=data.name,
+        email=data.email,
+        password=hashed_password,
+        role=data.role
     )
 
     db.add(user)
     db.commit()
     db.refresh(user)
 
-    return {"message": "User registered successfully", "user_id": user.id}
+    return {"message": "User registered successfully"}
 
+@app.post("/login")
+def login(email: str, password: str, db: Session = Depends(get_db)):
 
+    user = db.query(models.User).filter(models.User.email == email).first()
+
+    if not user:
+        raise HTTPException(status_code=400, detail="Invalid email")
+
+    if not verify_password(password, user.password):
+        raise HTTPException(status_code=400, detail="Invalid password")
+
+    token = create_access_token({
+        "sub": user.email,
+        "role": user.role,
+        "id": user.id
+    })
+
+    return {"access_token": token, "token_type": "bearer"}
 
 @app.post("/create-event")
 def create_event(
-    title: str,
-    description: str,
-    venue: str,
-    fee: float,
-    participant_limit: int,
-    db: Session = Depends(get_db)
+    title: str = Form(...),
+    description: str = Form(...),
+    venue: str = Form(...),
+    fee: float = Form(...),
+    participant_limit: int = Form(...),
+    poster: UploadFile = File(None),
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user)
 ):
+
+    if user["role"] != "host":
+        raise HTTPException(status_code=403, detail="Only hosts can create events")
+
+    poster_filename = None
+
+    if poster:
+        poster_filename = f"{uuid.uuid4()}_{poster.filename}"
+        filepath = os.path.join("uploads", poster_filename)
+
+        with open(filepath, "wb") as buffer:
+            shutil.copyfileobj(poster.file, buffer)
 
     event = models.Event(
         title=title,
         description=description,
         venue=venue,
         fee=fee,
-        participant_limit=participant_limit
+        participant_limit=participant_limit,
+        host_id=user["id"],
+        poster=poster_filename
     )
 
     db.add(event)
@@ -80,43 +134,78 @@ def create_event(
 
     return {"message": "Event created successfully", "event_id": event.id}
 
-
-
 @app.get("/events")
 def get_events(db: Session = Depends(get_db)):
+    return db.query(models.Event).all()
 
-    events = db.query(models.Event).all()
+@app.get("/host/events")
+def get_host_events(db: Session = Depends(get_db), user=Depends(get_current_user)):
 
-    return events
+    if user["role"] != "host":
+        raise HTTPException(status_code=403, detail="Only hosts allowed")
 
+    return db.query(models.Event).filter(models.Event.host_id == user["id"]).all()
 
-@app.get("/generate-qr/{event_id}")
-def generate_qr(event_id: int):
+@app.delete("/delete-event/{event_id}")
+def delete_event(event_id: int, db: Session = Depends(get_db), user=Depends(get_current_user)):
 
-    data = f"CampusIQ Event ID: {event_id}"
-
-    img = qrcode.make(data)
-
-    filename = f"event_{event_id}_qr.png"
-
-    img.save(filename)
-
-    return {"message": "QR code generated", "file": filename}
-
-
-
-
-
-@app.post("/register-event")
-def register_event(user_id: int, event_id: int, db: Session = Depends(get_db)):
-
-    # Check if event exists
     event = db.query(models.Event).filter(models.Event.id == event_id).first()
 
     if not event:
         raise HTTPException(status_code=404, detail="Event not found")
 
-    # Check if event is full
+    if event.host_id != user["id"]:
+        raise HTTPException(status_code=403, detail="Not allowed")
+
+    # delete all registrations of this event first
+    db.query(models.Registration).filter(
+        models.Registration.event_id == event_id
+    ).delete()
+
+    # now delete event
+    db.delete(event)
+    db.commit()
+
+    return {"message": "Event deleted successfully"}
+
+@app.put("/edit-event/{event_id}")
+def edit_event(
+    event_id: int,
+    title: str,
+    description: str,
+    venue: str,
+    fee: float,
+    participant_limit: int,
+    db: Session = Depends(get_db),
+    user=Depends(get_current_user)
+):
+
+    event = db.query(models.Event).filter(models.Event.id == event_id).first()
+
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+
+    if event.host_id != user["id"]:
+        raise HTTPException(status_code=403, detail="Not allowed")
+
+    event.title = title
+    event.description = description
+    event.venue = venue
+    event.fee = fee
+    event.participant_limit = participant_limit
+
+    db.commit()
+
+    return {"message": "Event updated"}
+
+@app.post("/register-event")
+def register_event(user_id: int, event_id: int, db: Session = Depends(get_db)):
+
+    event = db.query(models.Event).filter(models.Event.id == event_id).first()
+
+    if not event:
+        raise HTTPException(status_code=404, detail="Event not found")
+
     total_registered = db.query(models.Registration).filter(
         models.Registration.event_id == event_id
     ).count()
@@ -124,7 +213,6 @@ def register_event(user_id: int, event_id: int, db: Session = Depends(get_db)):
     if total_registered >= event.participant_limit:
         raise HTTPException(status_code=400, detail="Event is full")
 
-    # Check duplicate registration
     existing = db.query(models.Registration).filter(
         models.Registration.user_id == user_id,
         models.Registration.event_id == event_id
@@ -145,9 +233,7 @@ def register_event(user_id: int, event_id: int, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(registration)
 
-    # Generate QR Code
     qr_data = f"TICKET:{qr_token}"
-
     img = qrcode.make(qr_data)
 
     filename = f"{qr_token}.png"
@@ -158,120 +244,5 @@ def register_event(user_id: int, event_id: int, db: Session = Depends(get_db)):
     return {
         "message": "Event registered successfully",
         "qr_token": qr_token,
-        "qr_image": filepath
-    }
-
-@app.post("/scan-ticket")
-def scan_ticket(qr_token: str, db: Session = Depends(get_db)):
-
-    registration = db.query(models.Registration).filter(
-        models.Registration.qr_code == qr_token
-    ).first()
-
-    if not registration:
-        raise HTTPException(status_code=404, detail="Invalid Ticket")
-
-    if registration.checked_in:
-        raise HTTPException(status_code=400, detail="Ticket already used")
-
-    registration.checked_in = True
-    db.commit()
-
-    return {
-        "message": "Entry Allowed",
-        "registration_id": registration.id
-    }
-
-@app.get("/event-stats/{event_id}")
-def event_stats(event_id: int, db: Session = Depends(get_db)):
-
-    event = db.query(models.Event).filter(models.Event.id == event_id).first()
-
-    if not event:
-        raise HTTPException(status_code=404, detail="Event not found")
-
-    total_registered = db.query(models.Registration).filter(
-        models.Registration.event_id == event_id
-    ).count()
-
-    checked_in = db.query(models.Registration).filter(
-        models.Registration.event_id == event_id,
-        models.Registration.checked_in == True
-    ).count()
-
-    remaining_seats = event.participant_limit - total_registered
-
-    return {
-        "event_id": event_id,
-        "total_registered": total_registered,
-        "checked_in": checked_in,
-        "remaining_seats": remaining_seats
-    }
-@app.get("/dashboard/summary")
-def dashboard_summary(db: Session = Depends(get_db)):
-
-    total_events = db.query(models.Event).count()
-
-    total_registrations = db.query(models.Registration).count()
-
-    registrations = db.query(models.Registration).all()
-
-    total_revenue = 0
-
-    for reg in registrations:
-        event = db.query(models.Event).filter(models.Event.id == reg.event_id).first()
-        if event:
-            total_revenue += event.fee
-
-    return {
-        "total_events": total_events,
-        "total_registrations": total_registrations,
-        "total_revenue": total_revenue
-    }
-
-@app.get("/dashboard/event-details/{event_id}")
-def event_details(event_id: int, db: Session = Depends(get_db)):
-
-    event = db.query(models.Event).filter(models.Event.id == event_id).first()
-
-    if not event:
-        raise HTTPException(status_code=404, detail="Event not found")
-
-    registrations = db.query(models.Registration).filter(
-        models.Registration.event_id == event_id
-    ).count()
-
-    checked_in = db.query(models.Registration).filter(
-        models.Registration.event_id == event_id,
-        models.Registration.checked_in == True
-    ).count()
-
-    revenue = registrations * event.fee
-
-    return {
-        "event_id": event.id,
-        "title": event.title,
-        "registrations": registrations,
-        "checked_in": checked_in,
-        "revenue": revenue
-    }
-@app.get("/ai/predict-attendance/{event_id}")
-def predict_attendance(event_id:int, db:Session=Depends(get_db)):
-
-    event = db.query(models.Event).filter(models.Event.id==event_id).first()
-
-    if not event:
-        raise HTTPException(status_code=404, detail="Event not found")
-
-    registrations = db.query(models.Registration).filter(
-        models.Registration.event_id==event_id
-    ).count()
-
-    prediction = model.predict([[event.participant_limit,event.fee,registrations]])
-
-    predicted_attendance = int(prediction[0])
-
-    return {
-        "event_id": event_id,
-        "predicted_attendance": predicted_attendance
+        "qr_image": f"/qr_codes/{filename}"
     }

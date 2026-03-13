@@ -23,7 +23,8 @@ class Event(Base):
     fee = Column(Float, default=0)
     participant_limit = Column(Integer)
     created_at = Column(DateTime, default=datetime.utcnow)
-
+    host_id = Column(Integer, ForeignKey("users.id"))
+    poster = Column(String)
 
 class Registration(Base):
     __tablename__ = "registrations"
