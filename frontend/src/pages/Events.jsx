@@ -7,12 +7,14 @@ const [events,setEvents] = useState([])
 const [ticketQR,setTicketQR] = useState(null)
 
 const bookTicket = async(eventId)=>{
-
+const token = localStorage.getItem("token")
+const payload = JSON.parse(atob(token.split(".")[1]))
+const userId = payload.id
 try{
 
 const res = await API.post("/register-event",null,{
 params:{
-user_id:1,
+user_id:userId,
 event_id:eventId
 }
 })
