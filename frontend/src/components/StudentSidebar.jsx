@@ -1,8 +1,8 @@
-import { LayoutDashboard, Calendar, BarChart, User, LogOut, Users } from "lucide-react"
+import { LayoutDashboard, Ticket, Home, LogOut, User, Shield } from "lucide-react"
 import { useNavigate, useLocation } from "react-router-dom"
 import { logout } from "../utils/auth"
 
-function Sidebar() {
+function StudentSidebar() {
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -12,10 +12,9 @@ function Sidebar() {
   }
 
   const navItems = [
-    { path: "/host", icon: <LayoutDashboard size={18} />, label: "Dashboard" },
-    { path: "/manage-events", icon: <Calendar size={18} />, label: "Manage Events" },
-    { path: "/manage-volunteers", icon: <Users size={18} />, label: "Manage Volunteers" },
-    { path: "/host/analytics", icon: <BarChart size={18} />, label: "Analytics" },
+    { path: "/events", icon: <Home size={18} />, label: "Discover Events" },
+    { path: "/my-tickets", icon: <Ticket size={18} />, label: "My Tickets" },
+    { path: "/student/volunteer", icon: <Shield size={18} />, label: "Volunteer Dashboard" },
   ]
 
   return (
@@ -28,7 +27,7 @@ function Sidebar() {
           </div>
           <h1 className="text-xl font-bold text-blue-600">CampusIQ</h1>
         </div>
-        <p className="text-xs text-gray-400 uppercase tracking-wider mb-4 px-3">Host Panel</p>
+        <p className="text-xs text-gray-400 uppercase tracking-wider mb-4 px-3">Student Portal</p>
 
         <div className="flex flex-col gap-1">
           {navItems.map((item) => (
@@ -69,4 +68,4 @@ function Sidebar() {
   )
 }
 
-export default Sidebar
+export default StudentSidebar

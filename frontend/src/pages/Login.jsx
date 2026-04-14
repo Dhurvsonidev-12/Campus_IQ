@@ -2,127 +2,107 @@ import { useState } from "react"
 import API from "../api/api"
 import { useNavigate } from "react-router-dom"
 
-function Login(){
+function Login() {
+  const navigate = useNavigate()
 
- const navigate = useNavigate()
+  const [role, setRole] = useState("student")
+  const [email, setEmail] = useState("")
+  const [password, setPassword] = useState("")
+  const [loading, setLoading] = useState(false)
 
- const [role,setRole] = useState("student")
- const [email,setEmail] = useState("")
- const [password,setPassword] = useState("")
+  const login = async () => {
+    if (!email || !password) {
+      alert("Please enter email and password")
+      return
+    }
 
-const login = async () => {
+    setLoading(true)
+    try {
+      const res = await API.post("/login", null, {
+        params: { email, password }
+      })
 
-  try{
+      const token = res.data.access_token
+      const payload = JSON.parse(atob(token.split(".")[1]))
 
-   const res = await API.post("/login", null, {
-    params:{email,password}
-   })
+      if (payload.role !== role) {
+        alert(`Selected role does not match your account role. Your role is: ${payload.role}`)
+        setLoading(false)
+        return
+      }
 
-   const token = res.data.access_token
-   const payload = JSON.parse(atob(token.split(".")[1]))
+      localStorage.setItem("token", token)
 
-   if(payload.role !== role){
-    alert("Selected role does not match your account role")
-    return
-   }
+      if (payload.role === "host") navigate("/host")
+      else navigate("/events")
 
-   localStorage.setItem("token",token)
-
-   if(role === "host"){
-    navigate("/host")
-   }
-   else if(role === "volunteer"){
-    navigate("/scanner")
-   }
-   else{
-    navigate("/events")
-   }
-
-  }catch{
-   alert("Invalid email or password")
+    } catch {
+      alert("Invalid email or password")
+    } finally {
+      setLoading(false)
+    }
   }
 
-}
+  const roles = ["student", "host"]
 
- return(
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-100">
+      <div className="bg-white shadow-xl rounded-2xl p-8 w-96">
 
- <div className="min-h-screen flex items-center justify-center bg-gray-100">
+        <h1 className="text-2xl font-bold text-center mb-1">Welcome to CampusIQ</h1>
+        <p className="text-gray-500 text-sm text-center mb-6">Sign in to your account</p>
 
-  <div className="bg-white shadow-xl rounded-2xl p-8 w-96">
+        <p className="text-sm font-medium mb-2 text-gray-700">Select your role</p>
+        <div className="flex bg-gray-100 rounded-full p-1 mb-5">
+          {roles.map((r) => (
+            <button
+              key={r}
+              onClick={() => setRole(r)}
+              className={`flex-1 py-2 rounded-full text-sm capitalize transition-colors ${
+                role === r ? "bg-blue-600 text-white shadow" : "text-gray-600 hover:text-gray-800"
+              }`}
+            >
+              {r}
+            </button>
+          ))}
+        </div>
 
-   <h1 className="text-2xl font-bold text-center mb-6">
-    Welcome to CampusIQ
-   </h1>
+        <input
+          placeholder="Email Address"
+          type="email"
+          className="border border-gray-300 p-2 w-full mb-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          onChange={(e) => setEmail(e.target.value)}
+        />
 
-   <p className="text-sm mb-2">Role Selection</p>
+        <input
+          type="password"
+          placeholder="Password"
+          className="border border-gray-300 p-2 w-full mb-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          onChange={(e) => setPassword(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && login()}
+        />
 
-   <div className="flex bg-gray-200 rounded-full mb-5">
+        <button
+          onClick={login}
+          disabled={loading}
+          className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white w-full py-2 rounded-lg font-semibold transition-colors"
+        >
+          {loading ? "Signing in..." : "Login"}
+        </button>
 
-    <button
-     onClick={()=>setRole("student")}
-     className={`flex-1 py-2 rounded-full ${
-      role==="student" ? "bg-blue-600 text-white" : ""
-     }`}
-    >
-     Student
-    </button>
+        <p className="text-sm text-center mt-4 text-gray-600">
+          Don't have an account?{" "}
+          <span
+            className="text-blue-600 cursor-pointer font-medium hover:underline"
+            onClick={() => navigate("/")}
+          >
+            Register
+          </span>
+        </p>
 
-    <button
-     onClick={()=>setRole("host")}
-     className={`flex-1 py-2 rounded-full ${
-      role==="host" ? "bg-blue-600 text-white" : ""
-     }`}
-    >
-     Host
-    </button>
-
-    <button
-     onClick={()=>setRole("volunteer")}
-     className={`flex-1 py-2 rounded-full ${
-      role==="volunteer" ? "bg-blue-600 text-white" : ""
-     }`}
-    >
-     Volunteer
-    </button>
-
-   </div>
-
-   <input
-    placeholder="Email Address"
-    className="border p-2 w-full mb-3 rounded"
-    onChange={(e)=>setEmail(e.target.value)}
-   />
-
-   <input
-    type="password"
-    placeholder="Password"
-    className="border p-2 w-full mb-4 rounded"
-    onChange={(e)=>setPassword(e.target.value)}
-   />
-
-   <button
-    onClick={login}
-    className="bg-blue-600 text-white w-full py-2 rounded-lg"
-   >
-    Login
-   </button>
-
-   <p className="text-sm text-center mt-4">
-    Don't have an account?
-    <span
-     className="text-blue-600 cursor-pointer ml-1"
-     onClick={()=>navigate("/")}
-    >
-     Register
-    </span>
-   </p>
-
-  </div>
-
- </div>
-
- )
-
+      </div>
+    </div>
+  )
 }
 
 export default Login

@@ -30,7 +30,7 @@ function Host() {
 
       alert("Event Created!")
 
-    } catch (err) {
+    } catch {
 
       alert("Error creating event")
 

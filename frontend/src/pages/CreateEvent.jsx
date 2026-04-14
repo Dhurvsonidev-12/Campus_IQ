@@ -1,128 +1,87 @@
 import { useState } from "react"
 import API from "../api/api"
+import { getToken } from "../utils/auth"
 import Sidebar from "../components/Sidebar"
+import EventForm from "../components/EventForm"
+import { useNavigate } from "react-router-dom"
 
-function CreateEvent(){
+function CreateEvent() {
+  const navigate = useNavigate()
+  const [loading, setLoading] = useState(false)
+  const [poster, setPoster] = useState(null)
 
- const [title,setTitle] = useState("")
- const [description,setDescription] = useState("")
- const [venue,setVenue] = useState("")
- const [fee,setFee] = useState("")
- const [limit,setLimit] = useState("")
- const [poster,setPoster] = useState(null)
+  const [values, setValues] = useState({
+    title: "",
+    description: "",
+    venue: "",
+    date: "",
+    endDate: "",
+    fee: "",
+    limit: "",
+    maxVolunteers: ""
+  })
 
-const createEvent = async () => {
+  const handleChange = (field, value) => {
+    setValues(prev => ({ ...prev, [field]: value }))
+  }
 
- const token = localStorage.getItem("token")
-
- const formData = new FormData()
-
- formData.append("title", title)
- formData.append("description", description)
- formData.append("venue", venue)
- formData.append("fee", Number(fee))
- formData.append("participant_limit", Number(limit))
-
- if (poster) {
-  formData.append("poster", poster)
- }
-
- try {
-
-  const res = await API.post(
-   "/create-event",
-   formData,
-   {
-    headers:{
- Authorization:`Bearer ${token}`
+  const createEvent = async () => {
+    if (!values.title || !values.venue) {
+      alert("Title and venue are required")
+      return
     }
-   }
-  )
 
-  alert("Event Created")
+    const token = getToken()
+    const formData = new FormData()
 
- } catch(err){
+    formData.append("title", values.title)
+    formData.append("description", values.description)
+    formData.append("venue", values.venue)
+    formData.append("fee", Number(values.fee) || 0)
+    formData.append("participant_limit", Number(values.limit) || 0)
+    if (values.date) formData.append("event_date", values.date)
+    if (values.endDate) formData.append("event_end_date", values.endDate)
+    if (values.maxVolunteers) formData.append("max_volunteers", Number(values.maxVolunteers))
+    if (poster) formData.append("poster", poster)
 
-  console.log(err.response)
-  alert("Error creating event")
+    setLoading(true)
+    try {
+      await API.post("/create-event", formData, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      })
+      alert("Event created successfully!")
+      navigate("/manage-events")
+    } catch (err) {
+      console.log(err.response)
+      alert(err.response?.data?.detail || "Error creating event")
+    } finally {
+      setLoading(false)
+    }
+  }
 
- }
+  return (
+    <div className="flex">
+      <Sidebar />
 
-}
+      <div className="flex-1 p-10 bg-gray-50 min-h-screen">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold">Create New Event</h1>
+          <p className="text-gray-500 mt-1">Fill in the details to publish a new event</p>
+        </div>
 
- return(
-
- <div className="flex">
-
-  <Sidebar/>
-
-  <div className="flex-1 p-10">
-
-   <h1 className="text-3xl font-bold mb-6">
-    The Creator’s Studio
-   </h1>
-
-   <div className="bg-white shadow-xl rounded-xl p-8 w-[500px]">
-
-    <h2 className="text-xl font-semibold mb-4">
-     Focused Form
-    </h2>
-
-    <input
-     placeholder="Event Title"
-     className="border p-2 w-full mb-3"
-     onChange={(e)=>setTitle(e.target.value)}
-    />
-
-    <textarea
-     placeholder="Description"
-     className="border p-2 w-full mb-3"
-     onChange={(e)=>setDescription(e.target.value)}
-    />
-
-    <input
-     placeholder="Venue"
-     className="border p-2 w-full mb-3"
-     onChange={(e)=>setVenue(e.target.value)}
-    />
-
-    <input
-     type="file"
-     onChange={(e)=>setPoster(e.target.files[0])}
-     className="border p-2 w-full mb-3"
-    />
-
-    <div className="flex gap-3 mt-4">
-
-     <input
-      placeholder="Entry Fee"
-      className="border p-2 flex-1"
-      onChange={(e)=>setFee(e.target.value)}
-     />
-
-     <input
-      placeholder="Participant Limit"
-      className="border p-2 flex-1"
-      onChange={(e)=>setLimit(e.target.value)}
-     />
-
+        <EventForm
+          values={values}
+          onChange={handleChange}
+          onPosterChange={setPoster}
+          onSubmit={createEvent}
+          submitLabel="Create Event"
+          loading={loading}
+        />
+      </div>
     </div>
-
-    <button
-     onClick={createEvent}
-     className="bg-blue-600 text-white w-full py-2 mt-5 rounded-lg"
-    >
-     Create Event
-    </button>
-
-   </div>
-
-  </div>
-
- </div>
-
- )
-
+  )
 }
 
 export default CreateEvent

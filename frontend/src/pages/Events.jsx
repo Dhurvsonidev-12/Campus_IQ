@@ -1,117 +1,262 @@
-import { useEffect, useState } from "react"
-import API from "../api/api"
+import { useEffect, useState, useCallback } from "react"
+import API, { API_BASE } from "../api/api"
+import { getUserId, getToken } from "../utils/auth"
+import StudentSidebar from "../components/StudentSidebar"
+import { MapPin, IndianRupee, Users, Calendar, Ticket, Search, X, SlidersHorizontal } from "lucide-react"
 
-function Events(){
+function Events() {
+  const [events, setEvents] = useState([])
+  const [ticketQR, setTicketQR] = useState(null)
+  const [bookedEventTitle, setBookedEventTitle] = useState("")
+  const [loading, setLoading] = useState(true)
+  const [bookingId, setBookingId] = useState(null)
+  const [applyingId, setApplyingId] = useState(null)
+  const [searchQuery, setSearchQuery] = useState("")
+  const [searchTimeout, setSearchTimeout] = useState(null)
 
-const [events,setEvents] = useState([])
-const [ticketQR,setTicketQR] = useState(null)
+  const fetchEvents = useCallback((search = "") => {
+    const token = getToken()
+    setLoading(true)
+    const params = search ? { search } : {}
+    API.get("/events", {
+      params,
+      headers: { Authorization: `Bearer ${token}` }
+    })
+      .then(res => setEvents(res.data))
+      .catch(err => console.log(err))
+      .finally(() => setLoading(false))
+  }, [])
 
-const bookTicket = async(eventId)=>{
-const token = localStorage.getItem("token")
-const payload = JSON.parse(atob(token.split(".")[1]))
-const userId = payload.id
-try{
+  useEffect(() => {
+    fetchEvents()
+  }, [])
 
-const res = await API.post("/register-event",null,{
-params:{
-user_id:userId,
-event_id:eventId
-}
-})
+  const handleSearch = (value) => {
+    setSearchQuery(value)
+    if (searchTimeout) clearTimeout(searchTimeout)
+    const timeout = setTimeout(() => {
+      fetchEvents(value)
+    }, 300)
+    setSearchTimeout(timeout)
+  }
 
-setTicketQR(res.data.qr_image)
+  const clearSearch = () => {
+    setSearchQuery("")
+    fetchEvents("")
+  }
 
-alert("Ticket Booked Successfully!")
+  const bookTicket = async (eventId, eventTitle) => {
+    const userId = getUserId()
+    const token = getToken()
 
-}catch(err){
+    if (!userId) {
+      alert("Session expired. Please login again.")
+      return
+    }
 
-alert(err.response?.data?.detail || "Error booking ticket")
+    setBookingId(eventId)
+    try {
+      const res = await API.post("/register-event", null, {
+        params: {
+          user_id: userId,
+          event_id: eventId
+        },
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      })
 
-}
+      setTicketQR(res.data.qr_image)
+      setBookedEventTitle(eventTitle)
+      alert("Ticket Booked Successfully!")
 
-}
+    } catch (err) {
+      alert(err.response?.data?.detail || "Error booking ticket")
+    } finally {
+      setBookingId(null)
+    }
+  }
 
-useEffect(()=>{
+  const applyVolunteer = async (eventId, eventTitle) => {
+    const token = getToken()
+    if (!token) {
+      alert("Session expired. Please login again.")
+      return
+    }
 
-API.get("/events")
-.then(res => setEvents(res.data))
-.catch(err => console.log(err))
+    setApplyingId(eventId)
+    try {
+      await API.post("/student/apply-volunteer", { event_id: eventId }, {
+        headers: { Authorization: `Bearer ${token}` }
+      })
+      alert(`Volunteer application submitted for ${eventTitle}!`)
+    } catch (err) {
+      alert(err.response?.data?.detail || "Error applying for volunteer")
+    } finally {
+      setApplyingId(null)
+    }
+  }
 
-},[])
+  return (
+    <div className="flex">
+      <StudentSidebar />
 
-return(
+      <div className="flex-1 min-h-screen bg-gray-50">
 
-<div className="min-h-screen bg-gray-100 p-10">
+        {/* Hero Header */}
+        <div className="bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 px-10 py-8">
+          <h1 className="text-3xl font-bold text-white mb-1">Discover Events</h1>
+          <p className="text-blue-100 mb-6">Find and register for events on your campus</p>
 
-<h1 className="text-4xl font-bold mb-10 text-center">
-CampusIQ Events
-</h1>
+          {/* Search Bar */}
+          <div className="relative max-w-xl">
+            <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              id="event-search-bar"
+              type="text"
+              placeholder="Search events, venues, organizations..."
+              value={searchQuery}
+              onChange={(e) => handleSearch(e.target.value)}
+              className="w-full pl-11 pr-10 py-3 rounded-xl border-0 shadow-lg focus:outline-none focus:ring-2 focus:ring-white/50 text-gray-800 placeholder-gray-400"
+            />
+            {searchQuery && (
+              <button
+                onClick={clearSearch}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition-colors"
+              >
+                <X size={18} />
+              </button>
+            )}
+          </div>
+        </div>
 
-<div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div className="p-10">
+          {searchQuery && (
+            <p className="text-gray-500 mb-4 text-sm">
+              Showing results for <span className="font-medium text-gray-700">"{searchQuery}"</span>
+              {!loading && <span> — {events.length} event{events.length !== 1 ? "s" : ""} found</span>}
+            </p>
+          )}
 
-{events.map(event=>(
+          {loading ? (
+            <div className="flex justify-center items-center h-48">
+              <div className="flex items-center gap-3 text-gray-400">
+                <div className="w-5 h-5 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+                Loading events...
+              </div>
+            </div>
+          ) : events.length === 0 ? (
+            <div className="text-center py-20 text-gray-400">
+              <Search size={48} className="mx-auto mb-4 opacity-30" />
+              <p className="text-xl font-medium">
+                {searchQuery ? "No events match your search" : "No events yet"}
+              </p>
+              <p className="text-sm mt-1">
+                {searchQuery ? "Try different keywords or clear the search" : "Check back later for upcoming events"}
+              </p>
+              {searchQuery && (
+                <button
+                  onClick={clearSearch}
+                  className="mt-4 text-blue-600 font-medium hover:underline"
+                >
+                  Clear search
+                </button>
+              )}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {events.map(event => (
+                <div
+                  key={event.id}
+                  className="bg-white shadow-sm rounded-xl overflow-hidden hover:shadow-lg transition-all duration-300 border border-gray-100 group"
+                >
+                  {event.poster ? (
+                    <img
+                      src={`${API_BASE}/uploads/${event.poster}`}
+                      className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
+                      alt={event.title}
+                    />
+                  ) : (
+                    <div className="w-full h-48 bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center">
+                      <Calendar size={48} className="text-white/70" />
+                    </div>
+                  )}
 
-<div key={event.id} className="bg-white shadow-lg rounded-xl overflow-hidden">
+                  <div className="p-5">
+                    <h2 className="text-xl font-semibold mb-3 text-gray-800">{event.title}</h2>
 
-{event.poster && (
+                    <p className="text-gray-500 text-sm mb-1 flex items-center gap-2">
+                      <MapPin size={14} className="text-blue-500" /> {event.venue}
+                    </p>
 
-<img
-src={`http://127.0.0.1:8001/uploads/${event.poster}`}
-className="w-full h-48 object-cover"
-/>
+                    {event.event_date && (
+                      <p className="text-gray-500 text-sm mb-1 flex items-center gap-2">
+                        <Calendar size={14} className="text-purple-500" />
+                        {new Date(event.event_date).toLocaleDateString("en-IN", {
+                          day: "numeric", month: "short", year: "numeric"
+                        })}
+                      </p>
+                    )}
 
-)}
+                    <p className="text-gray-700 text-sm mb-1 flex items-center gap-2">
+                      <IndianRupee size={14} className="text-yellow-500" />
+                      {event.fee === 0 ? (
+                        <span className="text-green-600 font-medium">Free</span>
+                      ) : (
+                        <span>₹{event.fee}</span>
+                      )}
+                    </p>
 
-<div className="p-5">
+                    {event.participant_limit > 0 && (
+                      <p className="text-gray-500 text-sm mb-4 flex items-center gap-2">
+                        <Users size={14} className="text-indigo-500" /> {event.participant_limit} spots
+                      </p>
+                    )}
 
-<h2 className="text-2xl font-semibold mb-2">
-{event.title}
-</h2>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => applyVolunteer(event.id, event.title)}
+                        disabled={applyingId === event.id || bookingId === event.id}
+                        className="bg-emerald-50 hover:bg-emerald-100 disabled:opacity-50 text-emerald-600 border border-emerald-200 px-3 py-2.5 rounded-lg w-1/2 font-medium transition-all duration-200"
+                      >
+                        {applyingId === event.id ? "Applying..." : "Volunteer"}
+                      </button>
+                      <button
+                        onClick={() => bookTicket(event.id, event.title)}
+                        disabled={bookingId === event.id || applyingId === event.id}
+                        className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-300 text-white px-3 py-2.5 rounded-lg w-1/2 font-medium transition-all duration-200 hover:shadow-md"
+                      >
+                        {bookingId === event.id ? "Booking..." : "Book Ticket"}
+                      </button>
+                    </div>
+                  </div>
 
-<p className="text-gray-600 mb-1">
-📍 {event.venue}
-</p>
+                </div>
+              ))}
+            </div>
+          )}
 
-<p className="text-gray-700 mb-4">
-💰 Fee: ₹{event.fee}
-</p>
+          {/* QR Ticket Display */}
+          {ticketQR && (
+            <div className="mt-16 text-center">
+              <div className="inline-block bg-white shadow-xl rounded-2xl p-8 border border-gray-100">
+                <Ticket size={32} className="mx-auto mb-3 text-blue-600" />
+                <h2 className="text-2xl font-bold mb-1">Your Ticket</h2>
+                <p className="text-gray-500 mb-5">{bookedEventTitle}</p>
+                <img
+                  src={`${API_BASE}${ticketQR}`}
+                  className="mx-auto w-56 h-56 object-contain"
+                  alt="QR Code"
+                />
+                <p className="text-sm text-gray-400 mt-4">Show this QR code at the event entrance</p>
+              </div>
+            </div>
+          )}
 
-<button
-onClick={()=>bookTicket(event.id)}
-className="bg-blue-600 text-white px-4 py-2 rounded w-full"
->
-Book Ticket
-</button>
-
-</div>
-
-</div>
-
-))}
-
-</div>
-
-{ticketQR &&(
-
-<div className="mt-16 text-center">
-
-<h2 className="text-2xl font-bold mb-5">
-Your Ticket QR
-</h2>
-
-<img
-src={`http://127.0.0.1:9000${ticketQR}`}
-className="mx-auto w-60"
-/>
-
-</div>
-
-)}
-
-</div>
-
-)
-
+        </div>
+      </div>
+    </div>
+  )
 }
 
 export default Events

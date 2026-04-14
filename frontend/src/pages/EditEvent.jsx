@@ -1,75 +1,111 @@
-import {useState} from "react"
-import {useParams,useNavigate} from "react-router-dom"
+import { useState, useEffect } from "react"
+import { useParams, useNavigate } from "react-router-dom"
 import API from "../api/api"
+import { getToken } from "../utils/auth"
+import Sidebar from "../components/Sidebar"
+import EventForm from "../components/EventForm"
 
-function EditEvent(){
+function EditEvent() {
+  const { id } = useParams()
+  const navigate = useNavigate()
+  const [loading, setLoading] = useState(false)
+  const [fetching, setFetching] = useState(true)
 
- const {id} = useParams()
- const navigate = useNavigate()
+  const [values, setValues] = useState({
+    title: "",
+    description: "",
+    venue: "",
+    date: "",
+    endDate: "",
+    fee: "",
+    limit: "",
+    maxVolunteers: ""
+  })
 
- const [title,setTitle] = useState("")
- const [description,setDescription] = useState("")
- const [venue,setVenue] = useState("")
- const [fee,setFee] = useState("")
- const [limit,setLimit] = useState("")
-
- const updateEvent = async () => {
-
-  const token = localStorage.getItem("token")
-
-  try{
-
-   await API.put(`/edit-event/${id}`,null,{
-    params:{
-     title,
-     description,
-     venue,
-     fee,
-     participant_limit:limit
-    },
-    headers:{
-     Authorization:`Bearer ${token}`
-    }
-   })
-
-   alert("Event Updated")
-
-   navigate("/manage-events")
-
-  }catch(err){
-
-   alert("Update failed")
-
+  const handleChange = (field, value) => {
+    setValues(prev => ({ ...prev, [field]: value }))
   }
 
- }
+  // Pre-fill with existing event data
+  useEffect(() => {
+    const token = getToken()
+    API.get(`/event/${id}`, {
+      headers: { Authorization: `Bearer ${token}` }
+    })
+      .then(res => {
+        const e = res.data
+        setValues({
+          title: e.title || "",
+          description: e.description || "",
+          venue: e.venue || "",
+          date: e.event_date ? e.event_date.slice(0, 16) : "",
+          endDate: e.event_end_date ? e.event_end_date.slice(0, 16) : "",
+          fee: e.fee ?? "",
+          limit: e.participant_limit ?? "",
+          maxVolunteers: e.max_volunteers ?? ""
+        })
+      })
+      .catch(err => {
+        console.log(err)
+        alert("Could not load event details")
+      })
+      .finally(() => setFetching(false))
+  }, [id])
 
- return(
+  const updateEvent = async () => {
+    const token = getToken()
+    setLoading(true)
 
- <div className="p-10">
+    const formData = new FormData()
+    formData.append("title", values.title)
+    formData.append("description", values.description)
+    formData.append("venue", values.venue)
+    formData.append("fee", Number(values.fee) || 0)
+    formData.append("participant_limit", Number(values.limit) || 0)
+    if (values.date) formData.append("event_date", values.date)
+    if (values.endDate) formData.append("event_end_date", values.endDate)
+    if (values.maxVolunteers) formData.append("max_volunteers", Number(values.maxVolunteers))
 
- <h1 className="text-3xl mb-5 font-bold">
- Edit Event
- </h1>
+    try {
+      await API.put(`/edit-event/${id}`, formData, {
+        headers: {
+          Authorization: `Bearer ${token}`
+        }
+      })
+      alert("Event updated successfully!")
+      navigate("/manage-events")
+    } catch (err) {
+      alert(err.response?.data?.detail || "Update failed")
+    } finally {
+      setLoading(false)
+    }
+  }
 
- <input placeholder="Title" onChange={(e)=>setTitle(e.target.value)} className="border p-2 block mb-3"/>
+  return (
+    <div className="flex">
+      <Sidebar />
 
- <textarea placeholder="Description" onChange={(e)=>setDescription(e.target.value)} className="border p-2 block mb-3"/>
+      <div className="flex-1 p-10 bg-gray-50 min-h-screen">
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold">Edit Event</h1>
+          <p className="text-gray-500 mt-1">Update the details of your event</p>
+        </div>
 
- <input placeholder="Venue" onChange={(e)=>setVenue(e.target.value)} className="border p-2 block mb-3"/>
-
- <input placeholder="Fee" onChange={(e)=>setFee(e.target.value)} className="border p-2 block mb-3"/>
-
- <input placeholder="Limit" onChange={(e)=>setLimit(e.target.value)} className="border p-2 block mb-3"/>
-
- <button onClick={updateEvent} className="bg-blue-600 text-white px-5 py-2 rounded">
- Update Event
- </button>
-
- </div>
-
- )
-
+        {fetching ? (
+          <p className="text-gray-400">Loading event details...</p>
+        ) : (
+          <EventForm
+            values={values}
+            onChange={handleChange}
+            onPosterChange={null}
+            onSubmit={updateEvent}
+            submitLabel="Update Event"
+            loading={loading}
+          />
+        )}
+      </div>
+    </div>
+  )
 }
 
 export default EditEvent

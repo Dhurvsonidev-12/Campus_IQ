@@ -1,19 +1,20 @@
 import { Navigate } from "react-router-dom"
 import { getUserRole } from "../utils/auth"
 
-function ProtectedRoute({children, role}){
+function ProtectedRoute({ children, role }) {
+  const userRole = getUserRole()
 
- const userRole = getUserRole()
+  if (!userRole) {
+    return <Navigate to="/login" />
+  }
 
- if(!userRole){
-  return <Navigate to="/login"/>
- }
+  if (role && userRole !== role) {
+    // Redirect to appropriate page based on their actual role
+    if (userRole === "host") return <Navigate to="/host" />
+    return <Navigate to="/events" />
+  }
 
- if(role && userRole !== role){
-  return <Navigate to="/login"/>
- }
-
- return children
+  return children
 }
 
 export default ProtectedRoute
