@@ -22,11 +22,11 @@ function Sidebar() {
     <div className="w-60 bg-white shadow-md h-screen p-5 flex flex-col justify-between sticky top-0">
 
       <div>
-        <div className="flex items-center gap-2 mb-8">
-          <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center">
-            <LayoutDashboard size={16} className="text-white" />
+        <div className="flex items-center gap-3 mb-8">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center overflow-hidden shadow-sm border border-gray-100">
+            <img src="/logo.png" alt="CampusIQ Logo" className="w-full h-full object-cover" />
           </div>
-          <h1 className="text-xl font-bold text-blue-600">CampusIQ</h1>
+          <h1 className="text-xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">CAMPUS_IQ</h1>
         </div>
         <p className="text-xs text-gray-400 uppercase tracking-wider mb-4 px-3">Host Panel</p>
 

@@ -43,8 +43,13 @@ function Register() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-100 to-blue-100">
       <div className="bg-white shadow-xl rounded-2xl p-8 w-96">
+        <div className="flex justify-center mb-6">
+          <div className="w-16 h-16 rounded-2xl overflow-hidden shadow-lg border-2 border-blue-100 flex items-center justify-center">
+            <img src="/logo.png" alt="Logo" className="w-full h-full object-cover" />
+          </div>
+        </div>
 
-        <h1 className="text-2xl font-bold mb-2">Create your CampusIQ account</h1>
+        <h1 className="text-2xl font-bold mb-2 text-center">Create your CAMPUS_IQ account</h1>
         <p className="text-gray-500 mb-6 text-sm">Sign up to discover, book, and host campus events.</p>
 
         <input
