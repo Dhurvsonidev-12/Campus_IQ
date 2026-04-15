@@ -64,15 +64,14 @@ CampusIQ is a premium, full-stack platform designed to revolutionize campus even
 
 ## 🏗️ Architecture
 
-```mermaid
-graph TD
-    User((User)) -->|React + Vite| Frontend[Frontend UI]
-    Frontend -->|REST API + JWT| Backend[FastAPI Server]
-    Backend -->|SQLAlchemy| DB[(PostgreSQL Database)]
-    Backend -->|QR Generator| QR[Ticket System]
-    Backend -->|ML Model| AI[AI Prediction Engine]
-    Volunteer -->|Scanner| Backend
-```
+![CampusIQ Architecture Diagram](docs/architecture.png)
+
+The system follows a modern decoupled architecture:
+- **Frontend**: React-based Single Page Application (SPA) providing a responsive user interface.
+- **Backend**: FastAPI REST server handling business logic, authentication, and AI processing.
+- **Database**: Persistent storage for user data, events, and ticket records.
+- **AI Engine**: Integrated predictions for event attendance analytics.
+- **Ticket System**: Automated QR code generation and verification pipeline.
 
 ---
 
