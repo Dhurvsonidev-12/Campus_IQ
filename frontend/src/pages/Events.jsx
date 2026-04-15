@@ -58,7 +58,6 @@ function Events() {
     try {
       const res = await API.post("/register-event", null, {
         params: {
-          user_id: userId,
           event_id: eventId
         },
         headers: {

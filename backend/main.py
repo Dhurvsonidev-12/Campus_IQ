@@ -415,7 +415,7 @@ def edit_event(
 # ─── REGISTRATION & TICKETS ─────────────────────────────────────────────
 
 @app.post("/register-event")
-def register_event(user_id: int, event_id: int, db: Session = Depends(get_db)):
+def register_event(event_id: int, db: Session = Depends(get_db), current_user=Depends(get_current_user)):
 
     event = db.query(models.Event).filter(models.Event.id == event_id).first()
 
@@ -430,7 +430,7 @@ def register_event(user_id: int, event_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Event is full")
 
     existing = db.query(models.Registration).filter(
-        models.Registration.user_id == user_id,
+        models.Registration.user_id == current_user["id"],
         models.Registration.event_id == event_id
     ).first()
 
@@ -440,7 +440,7 @@ def register_event(user_id: int, event_id: int, db: Session = Depends(get_db)):
     qr_token = str(uuid.uuid4())
 
     registration = models.Registration(
-        user_id=user_id,
+        user_id=current_user["id"],
         event_id=event_id,
         qr_code=qr_token
     )
