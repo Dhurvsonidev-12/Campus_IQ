@@ -12,5 +12,4 @@ services:
         sync: false # Set this in the Render dashboard
       - key: SECRET_KEY
         generateValue: true
-      - key: PYTHON_VERSION
-        value: 3.10.0
+      
