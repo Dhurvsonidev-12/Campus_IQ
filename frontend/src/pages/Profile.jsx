@@ -4,6 +4,7 @@ import API, { API_BASE } from "../api/api"
 import { getToken, getUserRole } from "../utils/auth"
 import Sidebar from "../components/Sidebar"
 import StudentSidebar from "../components/StudentSidebar"
+import { toast } from "react-hot-toast"
 
 function Profile() {
   const [loading, setLoading] = useState(true)
@@ -108,10 +109,10 @@ function Profile() {
         }
       })
       
-      alert("Profile updated successfully!")
+      toast.success("Profile updated successfully!")
     } catch (err) {
       console.error("Error updating profile:", err)
-      alert("Failed to update profile")
+      toast.error("Failed to update profile")
     } finally {
       setSaving(false)
     }

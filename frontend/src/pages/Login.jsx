@@ -1,6 +1,7 @@
 import { useState } from "react"
 import API from "../api/api"
 import { useNavigate } from "react-router-dom"
+import { toast } from "react-hot-toast"
 
 function Login() {
   const navigate = useNavigate()
@@ -12,7 +13,20 @@ function Login() {
 
   const login = async () => {
     if (!email || !password) {
-      alert("Please enter email and password")
+      toast.error("Please enter email and password")
+      return
+    }
+
+    const validateEmail = (email) => {
+      return String(email)
+        .toLowerCase()
+        .match(
+          /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/
+        );
+    };
+
+    if (!validateEmail(email)) {
+      toast.error("Please enter a valid email address")
       return
     }
 
@@ -26,7 +40,7 @@ function Login() {
       const payload = JSON.parse(atob(token.split(".")[1]))
 
       if (payload.role !== role) {
-        alert(`Selected role does not match your account role. Your role is: ${payload.role}`)
+        toast.error(`Selected role does not match your account role. Your role is: ${payload.role}`)
         setLoading(false)
         return
       }
@@ -36,8 +50,10 @@ function Login() {
       if (payload.role === "host") navigate("/host")
       else navigate("/events")
 
+      toast.success("Welcome back!")
+
     } catch {
-      alert("Invalid email or password")
+      toast.error("Invalid email or password")
     } finally {
       setLoading(false)
     }

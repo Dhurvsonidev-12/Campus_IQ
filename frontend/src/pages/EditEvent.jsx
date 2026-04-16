@@ -4,6 +4,7 @@ import API from "../api/api"
 import { getToken } from "../utils/auth"
 import Sidebar from "../components/Sidebar"
 import EventForm from "../components/EventForm"
+import { toast } from "react-hot-toast"
 
 function EditEvent() {
   const { id } = useParams()
@@ -47,7 +48,7 @@ function EditEvent() {
       })
       .catch(err => {
         console.log(err)
-        alert("Could not load event details")
+        toast.error("Could not load event details")
       })
       .finally(() => setFetching(false))
   }, [id])
@@ -72,10 +73,10 @@ function EditEvent() {
           Authorization: `Bearer ${token}`
         }
       })
-      alert("Event updated successfully!")
+      toast.success("Event updated successfully!")
       navigate("/manage-events")
     } catch (err) {
-      alert(err.response?.data?.detail || "Update failed")
+      toast.error(err.response?.data?.detail || "Update failed")
     } finally {
       setLoading(false)
     }

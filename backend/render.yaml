@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: campusiq-backend
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: alembic upgrade head && gunicorn -k uvicorn.workers.UvicornWorker main:app
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: campusiq-db
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: PYTHON_VERSION
+        value: 3.10.0
+      - key: STORAGE_DIR
+        value: /opt/render/project/src/backend/data
+    disk:
+      name: campusiq-storage
+      mountPath: /opt/render/project/src/backend/data
+      sizeGB: 1
+
+databases:
+  - name: campusiq-db
+    plan: free

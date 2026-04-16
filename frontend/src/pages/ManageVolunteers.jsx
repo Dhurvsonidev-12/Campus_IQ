@@ -3,6 +3,7 @@ import API from "../api/api"
 import { getToken } from "../utils/auth"
 import Sidebar from "../components/Sidebar"
 import { Users, Mail, Trash2, Plus, UserCheck, UserX, Shield, ChevronDown, Check, X } from "lucide-react"
+import { toast } from "react-hot-toast"
 
 function ManageVolunteers() {
   const [events, setEvents] = useState([])
@@ -48,7 +49,7 @@ function ManageVolunteers() {
       })
       fetchVolunteers()
     } catch (err) {
-      alert(err.response?.data?.detail || "Error updating volunteer")
+      toast.error(err.response?.data?.detail || "Error updating volunteer")
     }
   }
 
@@ -65,7 +66,7 @@ function ManageVolunteers() {
       setEmail("")
       fetchVolunteers()
     } catch (err) {
-      alert(err.response?.data?.detail || "Error adding volunteer")
+      toast.error(err.response?.data?.detail || "Error adding volunteer")
     } finally {
       setSubmitting(false)
     }
@@ -84,9 +85,9 @@ function ManageVolunteers() {
       })
       setBulkEmails("")
       fetchVolunteers()
-      alert(`${res.data.added.length} added, ${res.data.skipped.length} skipped`)
+      toast.success(`${res.data.added.length} added, ${res.data.skipped.length} skipped`)
     } catch (err) {
-      alert(err.response?.data?.detail || "Error adding volunteers")
+      toast.error(err.response?.data?.detail || "Error adding volunteers")
     } finally {
       setSubmitting(false)
     }
@@ -100,7 +101,7 @@ function ManageVolunteers() {
       })
       setVolunteers(volunteers.filter(v => v.id !== id))
     } catch (err) {
-      alert(err.response?.data?.detail || "Error removing volunteer")
+      toast.error(err.response?.data?.detail || "Error removing volunteer")
     }
   }
 

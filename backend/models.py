@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Boolean
+from sqlalchemy import Column, Integer, String, Float, DateTime, ForeignKey, Boolean, Index, UniqueConstraint
 from datetime import datetime
 from database import Base
 
@@ -10,7 +10,11 @@ class User(Base):
     name = Column(String, nullable=False)
     email = Column(String, unique=True, index=True)
     password = Column(String, nullable=False)
-    role = Column(String, default="student")
+    role = Column(String, default="student", index=True)
+    
+    # Auditing
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
     
     # Profile & Personal Details
     profile_photo = Column(String, nullable=True)
@@ -48,6 +52,9 @@ class Event(Base):
     poster = Column(String)
     event_date = Column(DateTime, nullable=True)
     event_end_date = Column(DateTime, nullable=True)
+    
+    # Auditing
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
 class Registration(Base):
@@ -55,14 +62,15 @@ class Registration(Base):
 
     id = Column(Integer, primary_key=True, index=True)
 
-    user_id = Column(Integer, ForeignKey("users.id"))
-    event_id = Column(Integer, ForeignKey("events.id"))
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"))
+    event_id = Column(Integer, ForeignKey("events.id", ondelete="CASCADE"))
 
-    qr_code = Column(String)
+    qr_code = Column(String, unique=True, index=True)
 
-    checked_in = Column(Boolean, default=False)
+    checked_in = Column(Boolean, default=False, index=True)
 
     created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
 class VolunteerWhitelist(Base):
@@ -70,8 +78,13 @@ class VolunteerWhitelist(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String, nullable=False)
-    event_id = Column(Integer, ForeignKey("events.id"))
-    host_id = Column(Integer, ForeignKey("users.id"))
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
-    status = Column(String, default="approved")
+    event_id = Column(Integer, ForeignKey("events.id", ondelete="CASCADE"))
+    host_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"))
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    status = Column(String, default="pending", index=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        UniqueConstraint('email', 'event_id', name='_email_event_uc'),
+    )

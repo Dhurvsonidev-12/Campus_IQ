@@ -3,6 +3,7 @@ import API, { API_BASE } from "../api/api"
 import { getUserId, getToken } from "../utils/auth"
 import StudentSidebar from "../components/StudentSidebar"
 import { MapPin, IndianRupee, Users, Calendar, Ticket, Search, X, SlidersHorizontal } from "lucide-react"
+import { toast } from "react-hot-toast"
 
 function Events() {
   const [events, setEvents] = useState([])
@@ -50,7 +51,7 @@ function Events() {
     const token = getToken()
 
     if (!userId) {
-      alert("Session expired. Please login again.")
+      toast.error("Session expired. Please login again.")
       return
     }
 
@@ -67,10 +68,10 @@ function Events() {
 
       setTicketQR(res.data.qr_image)
       setBookedEventTitle(eventTitle)
-      alert("Ticket Booked Successfully!")
+      toast.success("Ticket Booked Successfully!")
 
     } catch (err) {
-      alert(err.response?.data?.detail || "Error booking ticket")
+      toast.error(err.response?.data?.detail || "Error booking ticket")
     } finally {
       setBookingId(null)
     }
@@ -79,7 +80,7 @@ function Events() {
   const applyVolunteer = async (eventId, eventTitle) => {
     const token = getToken()
     if (!token) {
-      alert("Session expired. Please login again.")
+      toast.error("Session expired. Please login again.")
       return
     }
 
@@ -88,9 +89,9 @@ function Events() {
       await API.post("/student/apply-volunteer", { event_id: eventId }, {
         headers: { Authorization: `Bearer ${token}` }
       })
-      alert(`Volunteer application submitted for ${eventTitle}!`)
+      toast.success(`Volunteer application submitted for ${eventTitle}!`)
     } catch (err) {
-      alert(err.response?.data?.detail || "Error applying for volunteer")
+      toast.error(err.response?.data?.detail || "Error applying for volunteer")
     } finally {
       setApplyingId(null)
     }

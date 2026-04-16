@@ -25,12 +25,21 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-os.makedirs("qr_codes", exist_ok=True)
-os.makedirs("uploads", exist_ok=True)
+# Storage Configuration for Render/Production
+# By default, use local directory. If running on Render with a disk, 
+# you can set a STORAGE_DIR environment variable to point to the mounted disk.
+STORAGE_DIR = os.getenv("STORAGE_DIR", ".")
+QR_CODES_DIR = os.path.join(STORAGE_DIR, "qr_codes")
+UPLOADS_DIR = os.path.join(STORAGE_DIR, "uploads")
 
-app.mount("/qr_codes", StaticFiles(directory="qr_codes"), name="qr_codes")
-app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+os.makedirs(QR_CODES_DIR, exist_ok=True)
+os.makedirs(UPLOADS_DIR, exist_ok=True)
 
+app.mount("/qr_codes", StaticFiles(directory=QR_CODES_DIR), name="qr_codes")
+app.mount("/uploads", StaticFiles(directory=UPLOADS_DIR), name="uploads")
+
+# Create tables automatically for simple setups. 
+# For production/deployments, use 'alembic upgrade head' instead.
 Base.metadata.create_all(bind=engine)
 
 def get_db():
@@ -350,17 +359,7 @@ def delete_event(event_id: int, db: Session = Depends(get_db), user=Depends(get_
     if event.host_id != user["id"]:
         raise HTTPException(status_code=403, detail="Not allowed")
 
-    # delete all registrations of this event first
-    db.query(models.Registration).filter(
-        models.Registration.event_id == event_id
-    ).delete()
-
-    # delete volunteer whitelist entries for this event
-    db.query(models.VolunteerWhitelist).filter(
-        models.VolunteerWhitelist.event_id == event_id
-    ).delete()
-
-    # now delete event
+    # DB cascades handle related registrations/volunteers automatically
     db.delete(event)
     db.commit()
 

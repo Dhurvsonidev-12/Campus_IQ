@@ -1,5 +1,6 @@
 import { useState } from "react"
 import API from "../api/api"
+import { toast } from "react-hot-toast"
 
 function Host() {
 
@@ -28,12 +29,10 @@ function Host() {
           }
 })
 
-      alert("Event Created!")
+      toast.success("Event Created!")
 
     } catch {
-
-      alert("Error creating event")
-
+      toast.error("Error creating event")
     }
 
   }

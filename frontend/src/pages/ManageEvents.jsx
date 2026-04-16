@@ -4,6 +4,7 @@ import { getToken } from "../utils/auth"
 import Sidebar from "../components/Sidebar"
 import { useNavigate } from "react-router-dom"
 import { Calendar, MapPin, IndianRupee, Users, Pencil, Trash2 } from "lucide-react"
+import { toast } from "react-hot-toast"
 
 function ManageEvents() {
   const [events, setEvents] = useState([])
@@ -33,8 +34,9 @@ function ManageEvents() {
         headers: { Authorization: `Bearer ${token}` }
       })
       setEvents(events.filter(e => e.id !== id))
+      toast.success("Event deleted")
     } catch (err) {
-      alert(err.response?.data?.detail || "Delete failed")
+      toast.error(err.response?.data?.detail || "Delete failed")
     }
   }
 

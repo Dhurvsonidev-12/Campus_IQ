@@ -4,6 +4,7 @@ import { getToken } from "../utils/auth"
 import Sidebar from "../components/Sidebar"
 import EventForm from "../components/EventForm"
 import { useNavigate } from "react-router-dom"
+import { toast } from "react-hot-toast"
 
 function CreateEvent() {
   const navigate = useNavigate()
@@ -27,7 +28,7 @@ function CreateEvent() {
 
   const createEvent = async () => {
     if (!values.title || !values.venue) {
-      alert("Title and venue are required")
+      toast.error("Title and venue are required")
       return
     }
 
@@ -51,11 +52,11 @@ function CreateEvent() {
           Authorization: `Bearer ${token}`
         }
       })
-      alert("Event created successfully!")
+      toast.success("Event created successfully!")
       navigate("/manage-events")
     } catch (err) {
       console.log(err.response)
-      alert(err.response?.data?.detail || "Error creating event")
+      toast.error(err.response?.data?.detail || "Error creating event")
     } finally {
       setLoading(false)
     }

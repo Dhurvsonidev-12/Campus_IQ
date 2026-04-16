@@ -1,4 +1,5 @@
 import { BrowserRouter, Routes, Route } from "react-router-dom"
+import { Toaster } from "react-hot-toast"
 
 import Register from "./pages/Register"
 import Login from "./pages/Login"
@@ -19,6 +20,7 @@ import ProtectedRoute from "./components/ProtectedRoute"
 function App() {
   return (
     <BrowserRouter>
+      <Toaster position="top-right" reverseOrder={false} />
       <Routes>
 
         {/* Auth - Public */}

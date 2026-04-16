@@ -2,6 +2,7 @@ import { useState } from "react"
 import API from "../api/api"
 import { useNavigate } from "react-router-dom"
 import { GraduationCap, Megaphone, User, AlertCircle } from "lucide-react"
+import { toast } from "react-hot-toast"
 
 function Register() {
   const navigate = useNavigate()
@@ -9,12 +10,36 @@ function Register() {
   const [name, setName] = useState("")
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
   const [role, setRole] = useState("student")
   const [loading, setLoading] = useState(false)
 
+  const validateEmail = (email) => {
+    return String(email)
+      .toLowerCase()
+      .match(
+        /^(([^<>()[\]\\.,;:\s@"]+(\.[^<>()[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/
+      );
+  };
+
   const register = async () => {
-    if (!name || !email || !password) {
-      alert("Please fill in all fields")
+    if (!name || !email || !password || !confirmPassword) {
+      toast.error("Please fill in all fields")
+      return
+    }
+
+    if (!validateEmail(email)) {
+      toast.error("Please enter a valid email address")
+      return
+    }
+
+    if (password !== confirmPassword) {
+      toast.error("Passwords do not match!")
+      return
+    }
+
+    if (password.length < 6) {
+      toast.error("Password should be at least 6 characters")
       return
     }
 
@@ -26,10 +51,10 @@ function Register() {
         password,
         role
       })
-      alert("Account created successfully!")
+      toast.success("Account created successfully!")
       navigate("/login")
     } catch (err) {
-      alert(err.response?.data?.detail || "Registration failed. Please try again.")
+      toast.error(err.response?.data?.detail || "Registration failed. Please try again.")
     } finally {
       setLoading(false)
     }
@@ -68,8 +93,15 @@ function Register() {
         <input
           type="password"
           placeholder="Password"
-          className="border border-gray-300 p-2 w-full mb-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="border border-gray-300 p-2 w-full mb-3 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           onChange={(e) => setPassword(e.target.value)}
+        />
+
+        <input
+          type="password"
+          placeholder="Confirm Password"
+          className="border border-gray-300 p-2 w-full mb-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+          onChange={(e) => setConfirmPassword(e.target.value)}
         />
 
         <p className="text-sm font-medium mb-2 text-gray-700">I want to join as:</p>
