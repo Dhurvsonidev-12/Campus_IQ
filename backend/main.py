@@ -9,6 +9,11 @@ import qrcode
 import shutil
 import joblib
 from datetime import datetime, timedelta
+import io
+import cloudinary
+import cloudinary.uploader
+from cloudinary.uploader import upload
+from cloudinary.utils import cloudinary_url
 
 from database import engine, Base, SessionLocal
 import models
@@ -24,6 +29,14 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Cloudinary Configuration
+if os.getenv("CLOUDINARY_URL"):
+    cloudinary.config(
+        cloudinary_url=os.getenv("CLOUDINARY_URL")
+    )
+else:
+    print("WARNING: CLOUDINARY_URL not found. Cloud storage will be disabled.")
 
 # Storage Configuration for Render/Production
 # By default, use local directory. If running on Render with a disk, 
@@ -75,11 +88,25 @@ def create_volunteer_registration(user_id: int, event_id: int, db: Session):
             qr_code=qr_code_str
         )
         db.add(new_reg)
+        db.commit() # Commit to get potential IDs if needed, though not strictly required here
         
         qr_data = f"TICKET:{qr_code_str}"
         img = qrcode.make(qr_data)
-        filepath = os.path.join("qr_codes", f"{qr_code_str}.png")
-        img.save(filepath)
+        
+        if os.getenv("CLOUDINARY_URL"):
+            img_byte_arr = io.BytesIO()
+            img.save(img_byte_arr, format='PNG')
+            img_byte_arr = img_byte_arr.getvalue()
+            
+            upload_result = cloudinary.uploader.upload(
+                img_byte_arr,
+                public_id=f"qr_codes/{qr_code_str}",
+                folder="campusiq/qr_codes"
+            )
+            # We don't need to save the URL in the DB for Registration because it's derived from qr_code token
+        else:
+            filepath = os.path.join(QR_CODES_DIR, f"{qr_code_str}.png")
+            img.save(filepath)
 
 class RegisterRequest(BaseModel):
     name: str
@@ -225,17 +252,23 @@ def update_user_profile(
     user.org_address = org_address
 
     if profile_photo:
-        # Create profiles directory if it doesn't exist (handled in startup now, but safe to keep)
-        os.makedirs(os.path.join("uploads", "profiles"), exist_ok=True)
-        
-        file_extension = os.path.splitext(profile_photo.filename)[1]
-        filename = f"profile_{user.id}{file_extension}"
-        filepath = os.path.join("uploads", "profiles", filename)
-        
-        with open(filepath, "wb") as buffer:
-            shutil.copyfileobj(profile_photo.file, buffer)
+        if os.getenv("CLOUDINARY_URL"):
+            upload_result = cloudinary.uploader.upload(
+                profile_photo.file,
+                folder="campusiq/profiles",
+                public_id=f"profile_{user.id}"
+            )
+            user.profile_photo = upload_result["secure_url"]
+        else:
+            os.makedirs(os.path.join(UPLOADS_DIR, "profiles"), exist_ok=True)
+            file_extension = os.path.splitext(profile_photo.filename)[1]
+            filename = f"profile_{user.id}{file_extension}"
+            filepath = os.path.join(UPLOADS_DIR, "profiles", filename)
             
-        user.profile_photo = f"profiles/{filename}"
+            with open(filepath, "wb") as buffer:
+                shutil.copyfileobj(profile_photo.file, buffer)
+                
+            user.profile_photo = f"profiles/{filename}"
 
     db.commit()
     db.refresh(user)
@@ -265,11 +298,18 @@ def create_event(
     poster_filename = None
 
     if poster:
-        poster_filename = f"{uuid.uuid4()}_{poster.filename}"
-        filepath = os.path.join("uploads", poster_filename)
+        if os.getenv("CLOUDINARY_URL"):
+            upload_result = cloudinary.uploader.upload(
+                poster.file,
+                folder="campusiq/posters"
+            )
+            poster_filename = upload_result["secure_url"]
+        else:
+            poster_filename = f"{uuid.uuid4()}_{poster.filename}"
+            filepath = os.path.join(UPLOADS_DIR, poster_filename)
 
-        with open(filepath, "wb") as buffer:
-            shutil.copyfileobj(poster.file, buffer)
+            with open(filepath, "wb") as buffer:
+                shutil.copyfileobj(poster.file, buffer)
 
     parsed_event_date = None
     parsed_event_end_date = None
@@ -451,15 +491,28 @@ def register_event(event_id: int, db: Session = Depends(get_db), current_user=De
     qr_data = f"TICKET:{qr_token}"
     img = qrcode.make(qr_data)
 
-    filename = f"{qr_token}.png"
-    filepath = os.path.join("qr_codes", filename)
+    qr_image_url = f"/qr_codes/{qr_token}.png"
 
-    img.save(filepath)
+    if os.getenv("CLOUDINARY_URL"):
+        img_byte_arr = io.BytesIO()
+        img.save(img_byte_arr, format='PNG')
+        img_byte_arr = img_byte_arr.getvalue()
+        
+        upload_result = cloudinary.uploader.upload(
+            img_byte_arr,
+            public_id=f"{qr_token}",
+            folder="campusiq/qr_codes"
+        )
+        qr_image_url = upload_result["secure_url"]
+    else:
+        filename = f"{qr_token}.png"
+        filepath = os.path.join(QR_CODES_DIR, filename)
+        img.save(filepath)
 
     return {
         "message": "Event registered successfully",
         "qr_token": qr_token,
-        "qr_image": f"/qr_codes/{filename}"
+        "qr_image": qr_image_url
     }
 
 @app.get("/my-tickets")
@@ -482,7 +535,7 @@ def get_my_tickets(db: Session = Depends(get_db), user=Depends(get_current_user)
                 "event_end_date": event.event_end_date.isoformat() if event.event_end_date else None,
                 "event_poster": event.poster,
                 "qr_code": reg.qr_code,
-                "qr_image": f"/qr_codes/{reg.qr_code}.png",
+                "qr_image": cloudinary.utils.cloudinary_url(f"campusiq/qr_codes/{reg.qr_code}")[0] if os.getenv("CLOUDINARY_URL") else f"/qr_codes/{reg.qr_code}.png",
                 "checked_in": reg.checked_in,
                 "booked_at": reg.created_at.isoformat() if reg.created_at else None
             })
